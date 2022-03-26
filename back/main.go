@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"github.com/gorilla/mux"
+	"strconv"
 )
 
 type Task struct {
@@ -41,6 +43,7 @@ func getNextIndex() (result uint8) {
 
 func returnAllTasks(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Endpoint Hit: returnAllTasks")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(Tasks)
 }
 
@@ -56,14 +59,37 @@ func createOrReplaceTask(w http.ResponseWriter, r *http.Request) {
 		// check for update
 		Tasks[getTaskIndexFromId(task.Id)] = task
 	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(task)
 }
 
+func deleteTask(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(200)
+	w.Header().Set("Content-Type", "application/json")
+	resp := make(map[string]string)
+	resp["message"] = "Status Deleted"
+	jsonResp, _ := json.Marshal(resp)
+	vars := mux.Vars(r)
+	id, _ := strconv.ParseUint(vars["id"], 10, 8)
+	id8 := uint8(id)
+	// Delete element from id
+	var index = getTaskIndexFromId(id8)
+	if index >= 0 {
+		Tasks = append(Tasks[:index], Tasks[1+index:]...)
+	}
+	// w.Write(jsonResp)
+	json.NewEncoder(w).Encode(jsonResp)
+}
+
 func handleRequests() {
-	http.HandleFunc("/tasks", returnAllTasks)
-	http.HandleFunc("/tasks/create", createOrReplaceTask)
-	http.HandleFunc("/tasks/update", createOrReplaceTask)
-	log.Fatal(http.ListenAndServe(":10000", nil))
+	r := mux.NewRouter().StrictSlash(true)
+	r.HandleFunc("/tasks", returnAllTasks).Methods(http.MethodGet, http.MethodOptions)
+	r.HandleFunc("/tasks/create", createOrReplaceTask).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/tasks/update", createOrReplaceTask).Methods(http.MethodPut, http.MethodOptions)
+	r.HandleFunc("/tasks/{id}", deleteTask).Methods(http.MethodDelete, http.MethodOptions)
+	r.Use(mux.CORSMethodMiddleware(r))
+	log.Fatal(http.ListenAndServe(":10000", r))
 }
 
 func main() {
