@@ -16,10 +16,7 @@ type Task struct {
 	Done  bool   `json:"done"`
 }
 
-var Tasks = []Task{
-	{Id: 1, Title: "Tache 1", Done: false},
-	{Id: 2, Title: "Tache 2", Done: false},
-}
+var Tasks = []Task{}
 
 func getTaskIndexFromId(id uint8) (result int) {
 	result = -1
@@ -42,29 +39,45 @@ func getNextIndex() (result uint8) {
 }
 
 func returnAllTasks(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Endpoint Hit: returnAllTasks")
+	// CORS Only for local
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	log.Printf("%s %s", r.Method, r.URL.Path)
 	json.NewEncoder(w).Encode(Tasks)
 }
 
-func createOrReplaceTask(w http.ResponseWriter, r *http.Request) {
+func createTask(w http.ResponseWriter, r *http.Request) {
+	// CORS Only for local
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	log.Printf("%s %s", r.Method, r.URL.Path)
+	
+	// deserialize task
 	reqBody, _ := ioutil.ReadAll(r.Body)
 	var task Task
 	json.Unmarshal(reqBody, &task)
-	if getTaskIndexFromId(task.Id) == -1 {
-		// No index OR index not existing
-		task.Id = getNextIndex()
-		Tasks = append(Tasks, task)
-	} else {
-		// check for update
-		Tasks[getTaskIndexFromId(task.Id)] = task
-	}
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	task.Id = getNextIndex()
+	Tasks = append(Tasks, task)
+
 	json.NewEncoder(w).Encode(task)
 }
 
-func deleteTask(w http.ResponseWriter, r *http.Request) {
+func updateTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	log.Printf("%s %s", r.Method, r.URL.Path)
+
+	if r.Method == "PUT" {
+		reqBody, _ := ioutil.ReadAll(r.Body)
+		var task Task
+		json.Unmarshal(reqBody, &task)
+		Tasks[getTaskIndexFromId(task.Id)] = task
+		json.NewEncoder(w).Encode(task)
+	}
+}
+
+func deleteTask(w http.ResponseWriter, r *http.Request) {
+	// CORS Only for local
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	log.Printf("%s %s", r.Method, r.URL.Path)
 	w.WriteHeader(200)
 	w.Header().Set("Content-Type", "application/json")
 	resp := make(map[string]string)
@@ -78,15 +91,15 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 	if index >= 0 {
 		Tasks = append(Tasks[:index], Tasks[1+index:]...)
 	}
-	// w.Write(jsonResp)
+
 	json.NewEncoder(w).Encode(jsonResp)
 }
 
 func handleRequests() {
 	r := mux.NewRouter().StrictSlash(true)
 	r.HandleFunc("/tasks", returnAllTasks).Methods(http.MethodGet, http.MethodOptions)
-	r.HandleFunc("/tasks/create", createOrReplaceTask).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/tasks/update", createOrReplaceTask).Methods(http.MethodPut, http.MethodOptions)
+	r.HandleFunc("/tasks/create", createTask).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/tasks/update", updateTask).Methods(http.MethodPut, http.MethodOptions)
 	r.HandleFunc("/tasks/{id}", deleteTask).Methods(http.MethodDelete, http.MethodOptions)
 	r.Use(mux.CORSMethodMiddleware(r))
 	log.Fatal(http.ListenAndServe(":10000", r))
