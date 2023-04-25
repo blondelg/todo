@@ -1,6 +1,6 @@
 # todo
 
-A simple todo list app to practice goland with a svelte frontend.
+A simple todo list app to practice [Goland](https://go.dev/) with a [Svelte](https://svelte.dev/) frontend.
 
 ![example](media/example.png)
 
